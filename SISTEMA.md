@@ -91,6 +91,15 @@ O **Shift3D** é uma plataforma **SaaS Freemium Automotiva** onde usuários inte
   - Contas administrativas (`admin@shift3d.com.br`) são redirecionadas automaticamente para `/admin` (`src/app/(admin)`).
 - [x] **Integração Full-Stack Validada (Next.js ↔ FastAPI):** Testadas e validadas todas as rotas `GET /api/v1/public/cars`, `GET /api/v1/app/cars/{id}/parts/{mesh_name}` (trava Freemium `is_locked: True` vs `False`) e `POST /api/v1/admin/parts` (cadastro global de `mesh_name` refletindo em tempo real no Palco 3D).
 
+### 📅 Entrega 05 — Configurador 3D Avançado (Taxonomia Base Universal + Hover + Elevação Lerp + Foco Translúcido)
+**Status:** ✅ Concluído, Compilado e Sincronizado na branch `dev`.
+- [x] **Taxonomia Base Universal de Peças Fixas (`repositories.py` & `CarViewer3D.tsx`):**
+  - Mapeadas as 7 malhas universais no Back-end e no Front-end 3D: `mesh_hood_01` (Capô), `mesh_front_bumper` (Para-choque dianteiro), `mesh_headlights` (Faróis Full LED), `mesh_doors` (Portas laterais), `mesh_wheels` (Rodas Aro 19" & Sensores), `mesh_engine_01` (Motor 2.0 Turbo) e `mesh_spark_plug` (Velas de Ignição com equivalência Fiat), mantendo extensibilidade dinâmica para malhas extras criadas no `/admin`.
+- [x] **Interação Visual de Configurador Automotivo (`CarViewer3D.tsx`):**
+  - **Hover (`onPointerOver`):** Brilho azul claro (`#38BDF8`) e leve elevação instantânea ao passar o mouse sobre qualquer peça clicável.
+  - **Clique & Elevação (`selectionOffset` com `lerp`):** A peça clicada eleva-se/desloca-se suavemente para fora do eixo do carro enquanto o Drawer lateral desliza com seus dados técnicos.
+  - **Foco Translúcido:** As demais peças não selecionadas ficam translúcidas (`opacity: 0.28`) para focar 100% da atenção na peça selecionada; ao clicar em outra peça, a anterior retorna suavemente à posição original e a nova peça sobe.
+
 ---
 
 ## 🚀 4. Próximos Passos Planejados (Roadmap Fase 3 e Evolução)

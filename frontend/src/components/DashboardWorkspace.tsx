@@ -16,7 +16,11 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/NavbarRoleSwitcher";
-import { CarViewer3D, CustomMeshDefinition } from "@/components/CarViewer3D";
+import {
+  BASE_UNIVERSAL_MESHES,
+  CarViewer3D,
+  CustomMeshDefinition,
+} from "@/components/CarViewer3D";
 import { PartDrawerPanel } from "@/components/PartDrawerPanel";
 import { useRole } from "@/context/RoleContext";
 import {
@@ -165,7 +169,7 @@ export function DashboardWorkspace() {
 
   // Malhas dinâmicas adicionais cadastradas via POST /api/v1/admin/parts no Backoffice
   const customMeshes: CustomMeshDefinition[] = allCatalogParts
-    .filter((p) => !CORE_MESHES.includes(p.mesh_name))
+    .filter((p) => !(BASE_UNIVERSAL_MESHES as readonly string[]).includes(p.mesh_name))
     .map((p) => ({
       mesh_name: p.mesh_name,
       name: p.name,
@@ -490,7 +494,10 @@ export function DashboardWorkspace() {
           part={currentPart}
           isOpen={isDrawerOpen}
           loading={loadingPart}
-          onClose={() => setIsDrawerOpen(false)}
+          onClose={() => {
+            setIsDrawerOpen(false);
+            setSelectedMesh(null);
+          }}
         />
       </div>
     </div>
