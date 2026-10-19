@@ -1,10 +1,12 @@
 /**
- * Cliente HTTP de Integração com a API Python FastAPI (/backend) - Shift3D.
+ * Cliente HTTP de Integração Full-Stack com a API Python FastAPI (/backend) - Shift3D.
  *
- * Centraliza todas as chamadas REST para `/api/v1/public`, `/api/v1/app` e `/api/v1/admin`,
- * injetando automaticamente o cabeçalho `X-User-Role` com o perfil ativo (`FREE`, `PRO` ou `ADMIN`).
- * Inclui também um Fallback inteligente local (Offline-First Resiliency) caso o servidor Python
- * na porta 8000 esteja sendo reiniciado, garantindo que a experiência 3D nunca quebre.
+ * Responsabilidades:
+ * 1. Conecta a Barra Superior de Filtros e o Catálogo 3D à rota pública `/api/v1/public/cars`.
+ * 2. Busca todas as peças ou uma peça específica por `mesh_name` em `/api/v1/app/cars/{carId}/parts/{meshName}`,
+ *    enviando o header `X-User-Role` (`FREE`, `PRO` ou `ADMIN`) para que o Back-end aplique a trava Freemium.
+ * 3. Envia a requisição `POST /api/v1/admin/parts` a partir do formulário do Painel Administrativo (`/admin`)
+ *    com o `mesh_name` correto, atualizando o repositório global em memória do servidor Python.
  */
 
 import { UserRoleType } from "@/context/RoleContext";
@@ -29,12 +31,23 @@ export interface PartData {
   oem_code: string;
   original_brand: string;
   original_price: number;
-  category: string;
+  category: str;
   description: string;
   purchase_url: string;
   explosion_vector: [number, number, number];
   cross_references: CrossReferenceItem[];
   viewer_role: UserRoleType;
+}
+
+export interface CarSummaryItem {
+  id: string;
+  brand: string;
+  model: string;
+  year: number;
+  engine_spec: string;
+  thumbnail_url: string;
+  total_parts: number;
+  available_meshes: string[];
 }
 
 export interface CreatePartPayload {
@@ -58,10 +71,10 @@ export interface CreatePartPayload {
   }[];
 }
 
-// URL base do Back-end FastAPI
+type str = string;
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// Cache espelhado em memória local para sincronia imediata caso a API esteja indisponível
 const LOCAL_FALLBACK_PARTS: Record<string, Omit<PartData, "viewer_role">> = {
   mesh_hood_01: {
     id: "part-bmw-hood-01",
@@ -177,9 +190,6 @@ const LOCAL_FALLBACK_PARTS: Record<string, Omit<PartData, "viewer_role">> = {
   },
 };
 
-/**
- * Aplica a regra da trava Freemium no fallback local caso a API Python esteja offline.
- */
 function applyClientSideFreemiumFilter(
   rawPart: Omit<PartData, "viewer_role">,
   role: UserRoleType
@@ -204,6 +214,36 @@ function applyClientSideFreemiumFilter(
       };
     }),
   };
+}
+
+/**
+ * Busca a lista pública de veículos na API Python (`GET /api/v1/public/cars`)
+ * para alimentar os seletores da Barra Superior de Filtros.
+ */
+export async function fetchPublicCarsCatalog(): Promise<CarSummaryItem[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/public/cars`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch {
+    // Fallback
+  }
+  return [
+    {
+      id: "bmw-x1-2024",
+      brand: "BMW",
+      model: "X1 sDrive20i M Sport",
+      year: 2024,
+      engine_spec: "2.0L TwinPower Turbo (192 cv / 28,5 kgfm)",
+      thumbnail_url: "/images/bmw-x1-wireframe.png",
+      total_parts: 4,
+      available_meshes: ["mesh_hood_01", "mesh_engine_01", "mesh_spark_plug", "mesh_wheels"],
+    },
+  ];
 }
 
 /**
@@ -233,10 +273,9 @@ export async function fetchPartByMeshName(
       return { data: json, source: "FASTAPI_BACKEND" };
     }
   } catch {
-    // Continua silenciosamente para o fallback caso o backend local na porta 8000 não esteja rodando
+    // Fallback local
   }
 
-  // Verifica se há peças customizadas salvas via Admin no localStorage
   if (typeof window !== "undefined") {
     const customStored = window.localStorage.getItem("shift3d_custom_parts");
     if (customStored) {
@@ -249,7 +288,7 @@ export async function fetchPartByMeshName(
           };
         }
       } catch {
-        // Ignora erro de parse
+        // Ignora
       }
     }
   }
@@ -262,7 +301,7 @@ export async function fetchPartByMeshName(
 }
 
 /**
- * Lista todas as peças cadastradas no veículo (para o Cockpit 3D e para o Dashboard Admin).
+ * Lista todas as peças cadastradas no veículo (`GET /api/v1/app/cars/{carId}/parts`).
  */
 export async function fetchAllCarParts(
   carId: string,
@@ -312,7 +351,7 @@ export async function registerPartAsAdmin(
 ): Promise<{ part: PartData; syncedWithBackend: boolean }> {
   if (role !== "ADMIN") {
     throw new Error(
-      `Acesso Negado (403): Seu perfil atual é '${role}'. Altere para 'ADMIN' na barra superior para cadastrar peças globalmente.`
+      `Acesso Negado (403): Seu perfil atual é '${role}'. Realize login administrativo em /login para cadastrar peças globalmente.`
     );
   }
 
@@ -331,7 +370,7 @@ export async function registerPartAsAdmin(
       return { part: created, syncedWithBackend: true };
     }
   } catch {
-    // Persiste também no localStorage caso o servidor FastAPI esteja offline
+    // Fallback
   }
 
   const savingsPct =

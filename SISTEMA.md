@@ -80,6 +80,17 @@ O **Shift3D** é uma plataforma **SaaS Freemium Automotiva** onde usuários inte
 - [x] **Gaveta Lateral Direita Deslizante (`PartDrawerPanel.tsx`):** Desliza suavemente da direita ao clicar em uma peça do carro 3D, com design de ficha técnica de engenharia (nome da peça, preço médio de mercado e seção de Peças Similares / Afiliados exibindo dados completos para `PRO` ou convite elegante para `FREE`).
 - [x] **Acesso Administrativo via Login (`/login` -> `/admin`):** Criada a página de Login Corporativo (`src/app/(public)/login/page.tsx`). A página `/admin` exige login com credenciais administrativas e não utiliza boxes clicáveis de simulador soltas pelo site.
 
+### 📅 Entrega 04 — Isolamento Estrito de Ambientes App Router (`(public)`, `(app)`, `(admin)`) & Validação Full-Stack E2E
+**Status:** ✅ Concluído, Testado e Sincronizado na branch `dev`.
+- [x] **Isolamento de Rotas para Futura Separação por Subdomínios:**
+  - `src/app/(public)/`: Contém a Landing Page Institucional e materiais de vendas (`/institucional`) e a página de Login Unificada (`/login`).
+  - `src/app/(app)/`: Contém o Sistema Principal do Usuário nas rotas `/` (`src/app/(app)/page.tsx`), `/dashboard` (`src/app/(app)/dashboard/page.tsx`) e `/cockpit` (`src/app/(app)/cockpit/page.tsx`), encapsulando `Sidebar`, Barra Superior de Filtros (conectada a `/api/v1/public/cars`), Palco 3D Gigante (`w-full h-[82vh]`) e Gaveta Lateral Direita (`PartDrawerPanel`).
+  - `src/app/(admin)/`: Contém o Backoffice restrito (`/admin` em `src/app/(admin)/admin/page.tsx`), acessível apenas após login administrativo.
+- [x] **Redirecionamentos Inteligentes de Login (`RoleContext.tsx`):**
+  - Contas comuns (`FREE` e `PRO`) são redirecionadas automaticamente para `/dashboard` (`src/app/(app)`).
+  - Contas administrativas (`admin@shift3d.com.br`) são redirecionadas automaticamente para `/admin` (`src/app/(admin)`).
+- [x] **Integração Full-Stack Validada (Next.js ↔ FastAPI):** Testadas e validadas todas as rotas `GET /api/v1/public/cars`, `GET /api/v1/app/cars/{id}/parts/{mesh_name}` (trava Freemium `is_locked: True` vs `False`) e `POST /api/v1/admin/parts` (cadastro global de `mesh_name` refletindo em tempo real no Palco 3D).
+
 ---
 
 ## 🚀 4. Próximos Passos Planejados (Roadmap Fase 3 e Evolução)

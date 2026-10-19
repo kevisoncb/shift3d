@@ -3,11 +3,11 @@
  *
  * Responsabilidades:
  * 1. Gerencia a sessão do usuário logado na plataforma SaaS (`FREE`, `PRO` ou `ADMIN`).
- * 2. Usuários `FREE` e `PRO` navegam exatamente na mesma interface de trabalho (Dashboard / Palco 3D),
- *    onde recursos exclusivos (como os códigos de Peças Similares / Cross-Reference e filtros avançados)
- *    apresentam acesso restrito / bloqueio elegante para contas `FREE` por não serem Premium.
- * 3. O acesso à área administrativa (`/admin`) não fica exposto como botão de troca livre na tela:
- *    exige autenticação real através da tela de Login Corporativo (`/login`).
+ * 2. Isola claramente o redirecionamento pós-login:
+ *    - Ao logar com conta comum (`FREE` ou `PRO`), redireciona para o sistema principal (`/dashboard`).
+ *    - Ao logar com credencial administrativa (`admin@shift3d.com.br`), redireciona para o Backoffice (`/admin`).
+ * 3. Mantém usuários `FREE` e `PRO` no mesmo ambiente (`src/app/(app)`), aplicando restrição
+ *    elegante nos recursos exclusivos do plano PRO.
  */
 
 "use client";
@@ -26,6 +26,7 @@ export interface AuthenticatedUser {
 interface RoleContextValue {
   role: UserRoleType;
   user: AuthenticatedUser;
+  isAuthenticated: boolean;
   setRole: (newRole: UserRoleType) => void;
   loginWithCredentials: (email: string, password?: string) => {
     success: boolean;
@@ -62,6 +63,7 @@ const RoleContext = createContext<RoleContextValue | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<UserRoleType>("FREE");
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("shift3d_active_role") as UserRoleType | null;
@@ -72,14 +74,14 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   const setRole = (newRole: UserRoleType) => {
     setRoleState(newRole);
+    setIsAuthenticated(true);
     window.localStorage.setItem("shift3d_active_role", newRole);
   };
 
   /**
-   * Realiza autenticação corporativa por credenciais na tela `/login`.
-   * - Credenciais de Admin (`admin@shift3d.com.br` / senha `admin` ou `admin123`) autenticam como `ADMIN` e direcionam para `/admin`.
-   * - Credenciais Pro (`pro@shift3d.com.br`) autenticam como `PRO`.
-   * - Demais e-mails corporativos autenticam no plano inicial `FREE`.
+   * Realiza autenticação corporativa unificada em `/login`:
+   * - Conta Admin (`admin@shift3d.com.br`) -> Redireciona para `/admin` (`src/app/(admin)`).
+   * - Conta Comum (`FREE` ou `PRO`) -> Redireciona para `/dashboard` (`src/app/(app)`).
    */
   const loginWithCredentials = (email: string, password = "") => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -109,7 +111,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       return {
         success: true,
         role: "PRO" as UserRoleType,
-        redirectUrl: "/",
+        redirectUrl: "/dashboard",
       };
     }
 
@@ -117,7 +119,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     return {
       success: true,
       role: "FREE" as UserRoleType,
-      redirectUrl: "/",
+      redirectUrl: "/dashboard",
     };
   };
 
@@ -126,7 +128,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    setRole("FREE");
+    setRoleState("FREE");
+    setIsAuthenticated(false);
+    window.localStorage.setItem("shift3d_active_role", "FREE");
   };
 
   return (
@@ -134,6 +138,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       value={{
         role,
         user: ACCOUNTS_DIRECTORY[role],
+        isAuthenticated,
         setRole,
         loginWithCredentials,
         upgradeToPro,

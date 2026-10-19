@@ -1,22 +1,15 @@
 /**
- * Componente Unificado de Plataforma SaaS Corporativa (`DashboardWorkspace`) - Shift3D.
+ * Ambiente Principal do Usuário (`DashboardWorkspace`) - Shift3D (`src/app/(app)`).
  *
- * Arquitetura Visual:
- * 1. Estrutura de Tela (Dashboard Layout):
- *    - Menu Lateral Fixo (`Sidebar`) à esquerda em `bg-slate-50` com borda fina à direita.
- *    - Área Principal (`main`) ocupando todo o restante da tela.
- * 2. Barra Superior de Filtros e Busca:
- *    - Seletores limpos de Marca (ex: BMW, Chevrolet, Fiat/Stellantis), Modelo e Barra de Busca
- *      Global rápida para localizar carros ou peças pelo nome ou código OEM.
- * 3. O Palco 3D Gigante (Foco Absoluto):
- *    - Visualizador 3D ocupando o centro da tela (`w-full h-[80vh]`), limpo, sem botões flutuantes
- *      exagerados — apenas um único botão minimalista e elegante no canto para "Modo Raio-X (Explodir Peças)".
- * 4. Gaveta Lateral Direita (`PartDrawerPanel`):
- *    - Desliza suavemente da direita quando o usuário clica em uma peça do carro 3D ou seleciona
- *      um item na busca superior.
- * 5. Mesma interface para FREE e PRO:
- *    - Usuários FREE e PRO utilizam exatamente o mesmo sistema; locais exclusivos (como códigos
- *      Cross-Reference na gaveta ou relatórios avançados de frota) exibem bloqueio elegante para contas FREE.
+ * Estrutura Corporativa Minimalista:
+ * 1. Sidebar Fixa Esquerda (`bg-slate-50` com `border-r border-slate-200`).
+ * 2. Barra Superior de Filtros (`h-16 bg-white border-b`): Conectada aos dados da API Python
+ *    (`/api/v1/public/cars` e `/api/v1/app/cars/{id}/parts`), contendo seletores limpos de Marca,
+ *    Modelo e Busca Global de Peças por nome ou código OEM. Exibida somente durante a apresentação do carro 3D.
+ * 3. Palco 3D Central (`w-full h-[82vh]`): Componente `CarViewer3D` imersivo sem cards na frente,
+ *    contendo apenas o botão flutuante elegante "Modo Raio-X (Explodir Peças)" no canto superior direito.
+ * 4. Gaveta Lateral Direita (`PartDrawerPanel`): Oculta por padrão (`isOpen: false`), desliza
+ *    suavemente da direita apenas quando o usuário clica em uma peça do 3D ou seleciona na busca.
  */
 
 "use client";
@@ -26,7 +19,13 @@ import { Sidebar } from "@/components/NavbarRoleSwitcher";
 import { CarViewer3D, CustomMeshDefinition } from "@/components/CarViewer3D";
 import { PartDrawerPanel } from "@/components/PartDrawerPanel";
 import { useRole } from "@/context/RoleContext";
-import { fetchAllCarParts, fetchPartByMeshName, PartData } from "@/lib/api";
+import {
+  CarSummaryItem,
+  fetchAllCarParts,
+  fetchPartByMeshName,
+  fetchPublicCarsCatalog,
+  PartData,
+} from "@/lib/api";
 import {
   Boxes,
   Lock,
@@ -45,7 +44,7 @@ const CORE_MESHES = [
   "mesh_wheels",
 ];
 
-// Catálogo de Marcas e Modelos na Barra Superior
+// Catálogo base enriquecido com os dados reais vindos da API Python (/api/v1/public/cars)
 const BRANDS_CATALOG: Record<
   string,
   { label: string; models: { id: string; name: string; premiumOnly?: boolean }[] }
@@ -69,16 +68,17 @@ const BRANDS_CATALOG: Record<
 export function DashboardWorkspace() {
   const { role, upgradeToPro } = useRole();
 
-  // Navegação lateral da Sidebar (painel, frota, configuracoes)
+  // Seção ativa na Sidebar ('painel' | 'frota' | 'configuracoes')
   const [activeSection, setActiveSection] = useState<string>("painel");
 
-  // Filtros superiores: Marca, Modelo e Busca Global
+  // Filtros Superiores conectados à API Python
+  const [apiCars, setApiCars] = useState<CarSummaryItem[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string>("BMW");
   const [selectedModel, setSelectedModel] = useState<string>("bmw-x1-2024");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [premiumAlert, setPremiumAlert] = useState<string | null>(null);
 
-  // Estados do Palco 3D e da Gaveta Lateral Direita
+  // Estados do Palco 3D e da Gaveta Lateral Direita (oculta por padrão)
   const [selectedMesh, setSelectedMesh] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isExploded, setIsExploded] = useState<boolean>(false);
@@ -86,17 +86,21 @@ export function DashboardWorkspace() {
   const [loadingPart, setLoadingPart] = useState<boolean>(false);
   const [allCatalogParts, setAllCatalogParts] = useState<PartData[]>([]);
 
-  // Carrega todas as peças do veículo para alimentar a busca global superior e malhas extras
-  const loadCatalogParts = useCallback(async () => {
-    const list = await fetchAllCarParts(DEFAULT_CAR_ID, role);
-    setAllCatalogParts(list);
+  // Carrega dados de veículos e peças diretamente da API Python FastAPI
+  const loadCatalogData = useCallback(async () => {
+    const [carsFromApi, partsFromApi] = await Promise.all([
+      fetchPublicCarsCatalog(),
+      fetchAllCarParts(DEFAULT_CAR_ID, role),
+    ]);
+    setApiCars(carsFromApi);
+    setAllCatalogParts(partsFromApi);
   }, [role]);
 
   useEffect(() => {
-    loadCatalogParts();
-  }, [loadCatalogParts]);
+    loadCatalogData();
+  }, [loadCatalogData]);
 
-  // Busca dados na API Python quando uma peça 3D é clicada e abre a Gaveta Lateral Direita
+  // Acionado ao clicar em uma peça no Palco 3D ou na Busca Global: busca na API Python e desliza a Gaveta Lateral Direita
   const handleSelectMesh = useCallback(
     async (meshName: string) => {
       setSelectedMesh(meshName);
@@ -112,14 +116,14 @@ export function DashboardWorkspace() {
     [role]
   );
 
-  // Recarrega a peça aberta caso o usuário faça upgrade para PRO com a gaveta aberta
+  // Atualiza instantaneamente os dados da gaveta caso o usuário ative o plano PRO com ela aberta
   useEffect(() => {
     if (selectedMesh && isDrawerOpen) {
       handleSelectMesh(selectedMesh);
     }
   }, [role, selectedMesh, isDrawerOpen, handleSelectMesh]);
 
-  // Filtra peças pela barra de busca superior
+  // Busca Global de Peças por nome, código OEM ou identificador de malha
   const filteredPartsBySearch = searchQuery.trim()
     ? allCatalogParts.filter(
         (p) =>
@@ -136,7 +140,7 @@ export function DashboardWorkspace() {
     if (firstModel) {
       if (firstModel.premiumOnly && role === "FREE") {
         setPremiumAlert(
-          `A frota completa da marca ${BRANDS_CATALOG[newBrand].label} é exclusiva para assinantes do plano PRO.`
+          `A frota completa da marca ${BRANDS_CATALOG[newBrand].label} requer assinatura PRO ativa.`
         );
       } else {
         setPremiumAlert(null);
@@ -151,7 +155,7 @@ export function DashboardWorkspace() {
     );
     if (modelObj?.premiumOnly && role === "FREE") {
       setPremiumAlert(
-        `O modelo "${modelObj.name}" requer licença PRO ativa para carregamento da malha 3D.`
+        `O modelo "${modelObj.name}" requer assinatura PRO para carregamento da malha 3D.`
       );
       return;
     }
@@ -159,6 +163,7 @@ export function DashboardWorkspace() {
     setSelectedModel(newModelId);
   };
 
+  // Malhas dinâmicas adicionais cadastradas via POST /api/v1/admin/parts no Backoffice
   const customMeshes: CustomMeshDefinition[] = allCatalogParts
     .filter((p) => !CORE_MESHES.includes(p.mesh_name))
     .map((p) => ({
@@ -167,14 +172,15 @@ export function DashboardWorkspace() {
       explosion_vector: p.explosion_vector,
     }));
 
+  const primaryApiCar = apiCars[0];
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-slate-900">
-      {/* 1. MENU LATERAL FIXO (SIDEBAR) */}
+      {/* 1. SIDEBAR FIXA ESQUERDA (bg-slate-50 com border-r border-slate-200) */}
       <Sidebar
         activeSection={activeSection}
         onSelectSection={(sec) => {
           setActiveSection(sec);
-          // Fecha a gaveta de detalhes da peça e alertas caso saia da visualização do carro 3D
           if (sec !== "painel") {
             setIsDrawerOpen(false);
             setPremiumAlert(null);
@@ -182,12 +188,12 @@ export function DashboardWorkspace() {
         }}
       />
 
-      {/* 2. ÁREA PRINCIPAL (MAIN CONTENT) */}
+      {/* 2. ÁREA PRINCIPAL DO SISTEMA */}
       <div className="relative flex flex-1 flex-col overflow-hidden bg-white">
-        {/* BARRA SUPERIOR DE FILTROS E BUSCA GLOBAL (Exibida SOMENTE na apresentação do carro 3D) */}
+        {/* BARRA SUPERIOR DE FILTROS (h-16 bg-white border-b) — Somente na apresentação do carro 3D */}
         {activeSection === "painel" && (
           <header className="z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
-            {/* Seletores de Marca e Modelo */}
+            {/* Seletores Limpos de Marca e Modelo */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-slate-500">Marca:</label>
@@ -212,14 +218,16 @@ export function DashboardWorkspace() {
                 >
                   {BRANDS_CATALOG[selectedBrand]?.models.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name}
+                      {m.id === "bmw-x1-2024" && primaryApiCar
+                        ? `${primaryApiCar.model} (${primaryApiCar.year})`
+                        : m.name}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Barra de Busca Global Rápida (Carros ou Peças por Nome / Código OEM) */}
+            {/* Busca Global de Peças por Nome ou Código OEM */}
             <div className="relative w-full max-w-md">
               <div className="relative flex items-center">
                 <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
@@ -227,12 +235,12 @@ export function DashboardWorkspace() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar peça por nome, código OEM (ex: 12-12) ou malha..."
+                  placeholder="Buscar peça por nome ou código OEM (ex: 12-12-0-040-551)..."
                   className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-9 pr-4 text-xs text-slate-900 placeholder-slate-400 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              {/* Dropdown Limpo de Resultados da Busca Rápida */}
+              {/* Resultados da Busca Global */}
               {searchQuery.trim() !== "" && (
                 <div className="absolute left-0 right-0 top-10 z-30 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                   {filteredPartsBySearch.length === 0 ? (
@@ -261,7 +269,7 @@ export function DashboardWorkspace() {
                             </span>
                           </div>
                           <span className="rounded bg-blue-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-blue-600">
-                            Inspecionar 3D
+                            Abrir no 3D
                           </span>
                         </button>
                       ))}
@@ -273,8 +281,8 @@ export function DashboardWorkspace() {
           </header>
         )}
 
-        {/* Aviso Elegante de Acesso Negado caso usuário FREE tente acessar um veículo/recurso exclusivo PRO */}
-        {premiumAlert && (
+        {/* Alerta sutil caso usuário FREE selecione veículo exclusivo PRO */}
+        {premiumAlert && activeSection === "painel" && (
           <div className="z-20 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-xs">
             <div className="flex items-center gap-2 text-slate-700">
               <Lock className="h-3.5 w-3.5 text-blue-600" />
@@ -289,7 +297,7 @@ export function DashboardWorkspace() {
                 }}
                 className="font-semibold text-blue-600 hover:text-blue-700"
               >
-                Desbloquear com Licença PRO →
+                Ativar Plano PRO →
               </button>
               <button
                 type="button"
@@ -302,11 +310,11 @@ export function DashboardWorkspace() {
           </div>
         )}
 
-        {/* CONTEÚDO CENTRAL: O PALCO 3D GIGANTE (Ou abas secundárias da Sidebar) */}
+        {/* 3. PALCO 3D CENTRAL IMERSIVO (w-full h-[82vh]) */}
         <main className="relative flex-1 overflow-y-auto p-6 bg-slate-50/40">
           {activeSection === "painel" && (
             <div className="relative h-[82vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              {/* Único Botão Flutuante Minimalista no Canto: Modo Raio-X (Explodir Peças) */}
+              {/* Único Botão Flutuante Elegante no Canto Superior Direito */}
               <div className="absolute top-4 right-4 z-10">
                 <button
                   type="button"
@@ -331,7 +339,7 @@ export function DashboardWorkspace() {
                 </button>
               </div>
 
-              {/* O Palco 3D Gigante */}
+              {/* Componente CarViewer3D ocupando 100% do Palco Central sem cards na frente */}
               <CarViewer3D
                 selectedMesh={selectedMesh}
                 isExploded={isExploded}
@@ -345,25 +353,24 @@ export function DashboardWorkspace() {
             <div className="mx-auto max-w-5xl space-y-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
-                  Catálogo de Frota & Modelos 3D
+                  Frota de Veículos Homologados
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Selecione um veículo homologado para abrir no Palco 3D ou gerencie sua licença.
+                  Selecione um veículo para inspecionar no Palco 3D.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Card Ativo: BMW X1 */}
                 <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div>
                     <span className="inline-block rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
-                      Liberado
+                      Disponível
                     </span>
                     <h3 className="mt-2 text-base font-bold text-slate-900">
                       BMW X1 sDrive20i (2024)
                     </h3>
                     <p className="mt-1 text-xs text-slate-500">
-                      Motor 2.0L TwinPower Turbo B48 • {allCatalogParts.length} componentes mapeados
+                      Motor 2.0L TwinPower Turbo B48 • {allCatalogParts.length} peças mapeadas na API
                     </p>
                   </div>
                   <button
@@ -375,7 +382,6 @@ export function DashboardWorkspace() {
                   </button>
                 </div>
 
-                {/* Cards Restritos ao Plano PRO (Acesso Negado para FREE) */}
                 {[
                   {
                     brand: "Chevrolet",
@@ -403,7 +409,7 @@ export function DashboardWorkspace() {
                           }`}
                         >
                           {locked && <Lock className="h-2.5 w-2.5" />}
-                          {locked ? "Exclusivo PRO" : "Liberado PRO"}
+                          {locked ? "Requer Plano PRO" : "Liberado PRO"}
                         </span>
                         <h3 className="mt-2 text-base font-bold text-slate-900">
                           {veh.brand} {veh.model}
@@ -418,7 +424,7 @@ export function DashboardWorkspace() {
                           className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                         >
                           <Lock className="h-3.5 w-3.5 text-blue-600" />
-                          Acesso Restrito (Ativar PRO)
+                          Ativar Plano PRO
                         </button>
                       ) : (
                         <button
@@ -445,7 +451,7 @@ export function DashboardWorkspace() {
                     Configurações da Conta & Assinatura
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Gerencie seu nível de acesso na plataforma Shift3D
+                    Gerencie seu plano de acesso na plataforma Shift3D
                   </p>
                 </div>
               </div>
@@ -453,7 +459,7 @@ export function DashboardWorkspace() {
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div>
                   <span className="block text-[11px] font-semibold uppercase text-slate-400">
-                    Plano Atual da Organização
+                    Plano Atual da Conta
                   </span>
                   <span className="text-sm font-bold text-slate-900">
                     Licença {role}
@@ -470,13 +476,9 @@ export function DashboardWorkspace() {
                     Fazer Upgrade para PRO
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => window.localStorage.setItem("shift3d_active_role", "FREE")}
-                    className="text-xs font-medium text-slate-500 hover:text-slate-800"
-                  >
-                    Licença PRO Ativa
-                  </button>
+                  <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    Assinatura Ativa
+                  </span>
                 )}
               </div>
             </div>
