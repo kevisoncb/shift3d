@@ -1,0 +1,14 @@
+# Dependências do Back-end Shift3D (FastAPI + DDD)
+# Framework web assíncrono de alta performance para construção da API REST
+fastapi==0.115.6
+
+# Servidor ASGI para execução da aplicação FastAPI em desenvolvimento e produção
+uvicorn[standard]==0.34.0
+
+# Biblioteca para validação de dados e serialização baseada em Type Hints
+pydantic==2.10.4
+
+# ORM e toolkit SQL preparado para integração futura com PostgreSQL / Supabase
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+python-dotenv==1.0.1
