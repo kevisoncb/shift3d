@@ -172,97 +172,106 @@ export function DashboardWorkspace() {
       {/* 1. MENU LATERAL FIXO (SIDEBAR) */}
       <Sidebar
         activeSection={activeSection}
-        onSelectSection={(sec) => setActiveSection(sec)}
+        onSelectSection={(sec) => {
+          setActiveSection(sec);
+          // Fecha a gaveta de detalhes da peça e alertas caso saia da visualização do carro 3D
+          if (sec !== "painel") {
+            setIsDrawerOpen(false);
+            setPremiumAlert(null);
+          }
+        }}
       />
 
       {/* 2. ÁREA PRINCIPAL (MAIN CONTENT) */}
       <div className="relative flex flex-1 flex-col overflow-hidden bg-white">
-        {/* BARRA SUPERIOR DE FILTROS E BUSCA GLOBAL */}
-        <header className="z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
-          {/* Seletores de Marca e Modelo */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-slate-500">Marca:</label>
-              <select
-                value={selectedBrand}
-                onChange={(e) => handleBrandChange(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
-              >
-                <option value="BMW">BMW</option>
-                <option value="CHEVROLET">Chevrolet</option>
-              </select>
-            </div>
-
-            <div className="h-4 w-px bg-slate-200" />
-
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-slate-500">Modelo:</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => handleModelChange(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
-              >
-                {BRANDS_CATALOG[selectedBrand]?.models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Barra de Busca Global Rápida (Carros ou Peças por Nome / Código OEM) */}
-          <div className="relative w-full max-w-md">
-            <div className="relative flex items-center">
-              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar peça por nome, código OEM (ex: 12-12) ou malha..."
-                className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-9 pr-4 text-xs text-slate-900 placeholder-slate-400 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            {/* Dropdown Limpo de Resultados da Busca Rápida */}
-            {searchQuery.trim() !== "" && (
-              <div className="absolute left-0 right-0 top-10 z-30 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                {filteredPartsBySearch.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-slate-500">
-                    Nenhuma peça encontrada para &ldquo;{searchQuery}&rdquo;.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredPartsBySearch.map((item) => (
-                      <button
-                        key={item.mesh_name}
-                        type="button"
-                        onClick={() => {
-                          if (item.mesh_name === "mesh_spark_plug" && !isExploded) {
-                            setIsExploded(true);
-                          }
-                          handleSelectMesh(item.mesh_name);
-                          setSearchQuery("");
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition hover:bg-slate-50"
-                      >
-                        <div>
-                          <p className="font-semibold text-slate-900">{item.name}</p>
-                          <span className="font-mono text-[10px] text-slate-400">
-                            OEM: {item.oem_code}
-                          </span>
-                        </div>
-                        <span className="rounded bg-blue-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-blue-600">
-                          Inspecionar 3D
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* BARRA SUPERIOR DE FILTROS E BUSCA GLOBAL (Exibida SOMENTE na apresentação do carro 3D) */}
+        {activeSection === "painel" && (
+          <header className="z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
+            {/* Seletores de Marca e Modelo */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500">Marca:</label>
+                <select
+                  value={selectedBrand}
+                  onChange={(e) => handleBrandChange(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
+                >
+                  <option value="BMW">BMW</option>
+                  <option value="CHEVROLET">Chevrolet</option>
+                </select>
               </div>
-            )}
-          </div>
-        </header>
+
+              <div className="h-4 w-px bg-slate-200" />
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-500">Modelo:</label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
+                >
+                  {BRANDS_CATALOG[selectedBrand]?.models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Barra de Busca Global Rápida (Carros ou Peças por Nome / Código OEM) */}
+            <div className="relative w-full max-w-md">
+              <div className="relative flex items-center">
+                <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar peça por nome, código OEM (ex: 12-12) ou malha..."
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-9 pr-4 text-xs text-slate-900 placeholder-slate-400 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              {/* Dropdown Limpo de Resultados da Busca Rápida */}
+              {searchQuery.trim() !== "" && (
+                <div className="absolute left-0 right-0 top-10 z-30 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                  {filteredPartsBySearch.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-slate-500">
+                      Nenhuma peça encontrada para &ldquo;{searchQuery}&rdquo;.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredPartsBySearch.map((item) => (
+                        <button
+                          key={item.mesh_name}
+                          type="button"
+                          onClick={() => {
+                            if (item.mesh_name === "mesh_spark_plug" && !isExploded) {
+                              setIsExploded(true);
+                            }
+                            handleSelectMesh(item.mesh_name);
+                            setSearchQuery("");
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition hover:bg-slate-50"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-900">{item.name}</p>
+                            <span className="font-mono text-[10px] text-slate-400">
+                              OEM: {item.oem_code}
+                            </span>
+                          </div>
+                          <span className="rounded bg-blue-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-blue-600">
+                            Inspecionar 3D
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </header>
+        )}
 
         {/* Aviso Elegante de Acesso Negado caso usuário FREE tente acessar um veículo/recurso exclusivo PRO */}
         {premiumAlert && (
